@@ -4,48 +4,38 @@ import { Canvas } from "@react-three/fiber"
 import { PerspectiveCamera } from "@react-three/drei"
 import { Armabee } from "@/components/Arambee"
 import { BlueDemon } from "@/components/BlueDemon"
+import { CharacterSelection } from "@/components/CharacterSelection"
+import { Dragon_Evolved } from "@/components/Dragon_Evolved"
 
 export default function PokemonBattle() {
+  const [selectedCharacter, setSelectedCharacter] = useState(null)
   const [playerHP] = useState(65) // Mock data - doesn't change
   const [enemyHP] = useState(100) // Mock data - doesn't change
   const [selectedAction, setSelectedAction] = useState(null)
   const [playerActions, setPlayerActions] = useState([])
   const [isAnimating, setIsAnimating] = useState(false)
-  
+
   const armabeeRef = useRef()
   const blueDemonRef = useRef()
 
   // Load available animations when models are ready
   useEffect(() => {
     const loadActions = () => {
-      // Load player actions
-      if (armabeeRef.current && playerActions.length === 0) {
+      if (selectedCharacter && armabeeRef.current && playerActions.length === 0) {
         try {
           const actions = armabeeRef.current.getAvailableAnimations()
-          console.log('🐝 Armabee animations available:', actions)
-          
+          console.log(`${selectedCharacter} animations available:`, actions)
+
           if (actions && actions.length > 0) {
-            // Filter out Flying_Idle since it's the default idle animation
             const actionsList = actions
-              .filter(action => action !== 'Flying_Idle')
+              .filter(action => !action.toLowerCase().includes('idle'))
               .map((action, index) => ({
                 name: action,
-                displayName: action.charAt(0).toUpperCase() + action.slice(1).replace(/([A-Z])/g, ' $1'),
+                displayName: action.charAt(0).toUpperCase() +
+                  action.slice(1).replace(/([A-Z])/g, ' $1'),
                 animation: action
               }))
             setPlayerActions(actionsList)
-            console.log('🎮 Armabee actions loaded (excluding Flying_Idle):', actionsList)
-            console.log('🐝 All available Armabee animations:', actions)
-          } else {
-            // Fallback actions
-            const fallbackActions = [
-              { name: 'Attack1', displayName: 'Attack 1', animation: 'Attack1' },
-              { name: 'Attack2', displayName: 'Attack 2', animation: 'Attack2' },
-              { name: 'Special', displayName: 'Special', animation: 'Special' },
-              { name: 'Idle', displayName: 'Idle', animation: 'Idle' }
-            ]
-            setPlayerActions(fallbackActions)
-            console.log('🔄 Fallback Armabee actions loaded:', fallbackActions)
           }
         } catch (error) {
           console.error('Error loading player actions:', error)
@@ -53,45 +43,74 @@ export default function PokemonBattle() {
       }
     }
 
-    // Check if models are ready and load actions
-    const checkModels = setInterval(() => {
-      loadActions()
-      
-      // Stop checking once actions are loaded
-      if (playerActions.length > 0) {
-        clearInterval(checkModels)
-        console.log('✅ Animation loading complete')
-      }
-    }, 1000)
-
-    // Initial check after a delay
-    setTimeout(loadActions, 2000)
+    setPlayerActions([]) // Reset actions when character changes
+    const checkModels = setInterval(loadActions, 1000)
 
     return () => clearInterval(checkModels)
-  }, [])
+  }, [selectedCharacter]) // Add selectedCharacter as dependency
 
   const handleAction = async (actionData) => {
     if (isAnimating) return
-    
+
     setIsAnimating(true)
     setSelectedAction(actionData)
-    
+
     console.log(`🎬 Playing animation: ${actionData.animation}`)
-    
+
     // Play player animation
     if (armabeeRef.current) {
       armabeeRef.current.playAnimation(actionData.animation)
     }
-    
+
     // Wait for animation
     await new Promise(resolve => setTimeout(resolve, 2000))
-    
+
     console.log(`✅ Animation complete: ${actionData.displayName}`)
     setIsAnimating(false)
   }
 
   const hpPercentage = (playerHP / 65) * 100
   const enemyHPPercentage = (enemyHP / 100) * 100
+
+  const handleCharacterSelect = (characterId) => {
+    setSelectedCharacter(characterId)
+  }
+
+  const getCharacterComponent = (characterId, isPlayer = true) => {
+    const props = {
+      ref: isPlayer ? armabeeRef : blueDemonRef,
+      scale: getCharacterScale(characterId)
+    }
+
+    switch (characterId) {
+      case 'armabee':
+        return <Armabee {...props} />
+      case 'bluedemon':
+        return <BlueDemon {...props} />
+      case 'evoldragon':
+        return <Dragon_Evolved {...props} />
+      default:
+        return null
+    }
+  }
+
+  const getCharacterScale = (characterId) => {
+    switch (characterId) {
+      case 'armabee':
+        return [0.6, 0.6, 0.6]
+      case 'bluedemon':
+        return [0.65, 0.65, 0.65]
+      case 'evoldragon':
+        return [0.7, 0.7, 0.7]
+      default:
+        return [0.6, 0.6, 0.6]
+    }
+  }
+
+  // If no character is selected, show character selection screen
+  if (!selectedCharacter) {
+    return <CharacterSelection onSelect={handleCharacterSelect} />
+  }
 
   return (
     <div className="relative w-full h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 overflow-hidden">
@@ -124,12 +143,17 @@ export default function PokemonBattle() {
             <meshStandardMaterial color="#78B850" />
           </mesh>
 
+          {/* Player Character Position */}
           <group position={[-2.5, 0, 2]} rotation={[0, Math.PI * 0.9, 0]}>
-            <Armabee ref={armabeeRef} scale={[0.6, 0.6, 0.6]} />
+            {getCharacterComponent(selectedCharacter, true)}
           </group>
 
+          {/* Enemy Position */}
           <group position={[3, 0, -3]} rotation={[0, -Math.PI * 0.15, 0]}>
-            <BlueDemon ref={blueDemonRef} scale={[0.65, 0.65, 0.65]} />
+            {getCharacterComponent(
+              characters.find(c => c.id !== selectedCharacter)?.id || 'bluedemon',
+              false
+            )}
           </group>
         </Canvas>
       </div>
@@ -181,11 +205,15 @@ export default function PokemonBattle() {
         <div className="backdrop-blur-md bg-white/10 border border-white/20 rounded-2xl p-6 w-96 shadow-2xl hover:bg-white/15 transition-all duration-300">
           <div className="flex items-center justify-between mb-5">
             <div>
-              <h3 className="text-white font-bold text-xl">Armabee</h3>
-              <p className="text-emerald-300 text-sm font-semibold">Lv 20</p>
+              <h3 className="text-white font-bold text-xl">
+                {selectedCharacter === 'armabee' ? 'Armabee' : 'BlueDemon'}
+              </h3>
+              <p className="text-emerald-300 text-sm font-semibold">
+                Lv {selectedCharacter === 'armabee' ? '20' : '22'}
+              </p>
             </div>
             <div className="text-right">
-              <p className="text-white/60 text-xs">Your Pokémon</p>
+              <p className="text-white/60 text-xs">Your Character</p>
             </div>
           </div>
 
@@ -231,11 +259,10 @@ export default function PokemonBattle() {
             {isAnimating ? `Playing: ${selectedAction?.displayName || 'Animation'}` : 'Ready to animate'}
           </p>
           <div className="flex justify-center mt-2">
-            <div className={`px-3 py-1 rounded-full text-xs font-bold ${
-              isAnimating 
-                ? 'bg-yellow-500/80 text-white' 
-                : 'bg-emerald-500/80 text-white'
-            }`}>
+            <div className={`px-3 py-1 rounded-full text-xs font-bold ${isAnimating
+              ? 'bg-yellow-500/80 text-white'
+              : 'bg-emerald-500/80 text-white'
+              }`}>
               {isAnimating ? '🎬 Animating' : '✅ Ready'}
             </div>
           </div>
@@ -249,12 +276,14 @@ export default function PokemonBattle() {
             {/* Dialog Text */}
             <div className="mb-6">
               <p className="text-white text-lg font-bold">
-                Choose an <span className="text-emerald-400">Armabee</span> animation to play:
+                Choose a <span className="text-emerald-400">
+                  {selectedCharacter === 'armabee' ? 'Armabee' : 'BlueDemon'}
+                </span> animation to play:
               </p>
               {isAnimating && (
                 <p className="text-yellow-400 text-sm mt-2">Playing animation...</p>
               )}
-              
+
               {/* Debug info */}
               <div className="text-xs text-white/50 mt-2">
                 Available Actions: {playerActions.length}
@@ -273,7 +302,7 @@ export default function PokemonBattle() {
                   { bg: "linear-gradient(135deg, #ec4899 0%, #db2777 100%)", shadow: "rgba(236, 72, 153, 0.3)" }
                 ]
                 const colorSet = colors[index % colors.length]
-                
+
                 return (
                   <button
                     key={action.name}
@@ -292,7 +321,7 @@ export default function PokemonBattle() {
                   </button>
                 )
               })}
-              
+
               {playerActions.length === 0 && (
                 <div className="col-span-2 md:col-span-4 text-center py-8">
                   <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div>
@@ -306,3 +335,9 @@ export default function PokemonBattle() {
     </div>
   )
 }
+
+const characters = [
+  { id: 'armabee', name: 'Armabee', level: 20, type: 'Flying' },
+  { id: 'bluedemon', name: 'BlueDemon', level: 22, type: 'Dark' },
+  { id: 'evoldragon', name: 'Dragon Evolved', level: 25, type: 'Fire' }
+]

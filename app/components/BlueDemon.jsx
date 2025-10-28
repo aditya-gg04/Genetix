@@ -12,16 +12,21 @@ export const BlueDemon = forwardRef(function BlueDemon(props, ref) {
       if (actions[animationName]) {
         // Stop all current animations
         Object.values(actions).forEach(action => action.stop())
-        
+
         // Play the requested animation once
         const action = actions[animationName]
-        action.reset().fadeIn(0.2).setLoop(false).play()
-        
-        // Return to Flying_Idle after animation completes
+        action.reset()
+          .fadeIn(0.2)
+          .setLoop(1) // Set to play only once
+          .play()
+
+        // Return to Idle after animation completes
+        action.clampWhenFinished = true // Holds the last frame
         action.onComplete = () => {
-          const idleAnimation = actions['Flying_Idle'] || actions['Idle'] || actions['idle'] || Object.values(actions)[0]
+          const idleAnimation = actions['Flying_Idle'] || actions['Idle'] || actions['idle']
           if (idleAnimation && idleAnimation !== action) {
-            idleAnimation.reset().fadeIn(0.5).play()
+            action.fadeOut(0.2)
+            idleAnimation.reset().fadeIn(0.2).play()
           }
         }
       }
@@ -33,7 +38,7 @@ export const BlueDemon = forwardRef(function BlueDemon(props, ref) {
   useEffect(() => {
     // Play Flying_Idle animation by default
     if (actions && Object.keys(actions).length > 0) {
-      const idleAnimation = actions['Flying_Idle'] 
+      const idleAnimation = actions['Flying_Idle']
       if (idleAnimation) {
         idleAnimation.play()
       }
